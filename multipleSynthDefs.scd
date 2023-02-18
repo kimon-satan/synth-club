@@ -83,79 +83,6 @@ SynthDef.new(\smoothSine,{|
 
 )
 
-(
-
-~potTemplates = Dictionary();
-~sliderTemplates = Dictionary();
-
-~potTemplates.put(\noiseySaw, [
-		[\carrier, ControlSpec.new(10,400,'exp'), 0.5],
-		[\syncRate, ControlSpec.new(1,50,'exp'), 0.5],
-		[\freqModFreq, ControlSpec.new(0.1,50,'exp'), 0.5],
-		[\freqAmp, ControlSpec.new(0,1,'lin'), 0],
-		[\ampModFreq, ControlSpec.new(0.1,50,'exp'), 0.5],
-		[\ampModAmp, ControlSpec.new(0,1,'lin'), 0],
-		[\filFreq, ControlSpec.new(10,4000,'exp'), 0],
-		[\rq, ControlSpec.new(0,1,'lin'), 0],
-	]);
-
-~potTemplates.put(\smoothSine, [
-		[\carrier, ControlSpec.new(10,400,'exp'), 0.5],
-		[\lfNoiseFreq, ControlSpec.new(1,25,'exp'), 0.5],
-		[\freqModFreq, ControlSpec.new(0.1,50,'exp'), 0.5],
-		[\freqAmp, ControlSpec.new(0,1,'lin'), 0],
-		[\ampModFreq, ControlSpec.new(0.1,50,'exp'), 0.5],
-		[\ampModAmp, ControlSpec.new(0,1,'lin'), 0],
-		[\lfFreq, ControlSpec.new(1,25,'exp'), 10],
-		[\lfAmp, ControlSpec.new(0.01,2000,'exp'), 0.01],
-	]);
-
-~sliderTemplates.put(\noiseySaw, [
-		[\amp,  ControlSpec.new(0,1,'lin'), 0.1],
-		[\pan,  ControlSpec.new(-1,1,'lin'), 0],
-		[\attackTime,  ControlSpec.new(0.01,5,'lin'), 0.01],
-		[\releaseTime,  ControlSpec.new(0.01,5,'lin'), 0.1],
-		[\lfNoiseFreq, ControlSpec.new(1,25,'exp'), 0.5],
-		[\lfNoiseAmp, ControlSpec.new(0,1,'lin'), 0],
-		[\lfFreq, ControlSpec.new(1,25,'exp'), 10],
-		[\lfAmp, ControlSpec.new(0.01,2000,'exp'), 0.01],
-	]);
-
-~sliderTemplates.put(\smoothSine, [
-		[\amp,  ControlSpec.new(0,1,'lin'), 0.1],
-		[\pan,  ControlSpec.new(-1,1,'lin'), 0],
-		[\attackTime,  ControlSpec.new(0.01,5,'lin'), 0.01],
-		[\releaseTime,  ControlSpec.new(0.01,5,'lin'), 0.1],
-		[\lfNoiseAmp, ControlSpec.new(0,1,'lin'), 0],
-	]);
-
-~synthPotControls = Dictionary();
-~synthSliderControls = Dictionary();
-~synthToggles = Dictionary();
-~synthTypes = Dictionary();
-
-8.do{|i|
-	var val = 36 + i, potControls, sliderControls;
-	~synthTypes.put(("synth_"++val).asSymbol, \smoothSine);
-
-	potControls = ~potTemplates.at(\smoothSine).collectCopy({|x|x.collectCopy({|y|y})});
-	~synthPotControls.put(("synth_"++val).asSymbol,
-		potControls
-	);
-	sliderControls = ~sliderTemplates.at(\smoothSine).collectCopy({|x|x.collectCopy({|y|y})});
-	~synthSliderControls.put(("synth_"++val).asSymbol,
-		sliderControls
-	);
-	~synthToggles.put(("synth_"++val).asSymbol, false);
-};
-
-~synths = Dictionary();
-~cSynth = nil;
-~cSynthKey = "synth_36".asSymbol;
-
-)
-
-
 
 (
 //create the new synth with values according to the knobs
@@ -205,7 +132,86 @@ SynthDef.new(\smoothSine,{|
 	}.defer;
 };
 
+~setSynthType = {|synth_key, synth_type|
+	var potControls, sliderControls;
+	~synthTypes.put(synth_key, synth_type);
+	potControls = ~potTemplates.at(synth_type).collectCopy({|x|x.collectCopy({|y|y})});
+	~synthPotControls.put(synth_key,
+		potControls
+	);
+	sliderControls = ~sliderTemplates.at(synth_type).collectCopy({|x|x.collectCopy({|y|y})});
+	~synthSliderControls.put(synth_key,
+		sliderControls
+	);
+};
+
 )
+
+
+(
+
+~potTemplates = Dictionary();
+~sliderTemplates = Dictionary();
+
+~potTemplates.put(\noiseySaw, [
+		[\carrier, ControlSpec.new(10,400,'exp'), 0.5],
+		[\syncRate, ControlSpec.new(1,50,'exp'), 0.5],
+		[\freqModFreq, ControlSpec.new(0.1,50,'exp'), 0.5],
+		[\freqAmp, ControlSpec.new(0,1,'lin'), 0],
+		[\ampModFreq, ControlSpec.new(0.1,50,'exp'), 0.5],
+		[\ampModAmp, ControlSpec.new(0,1,'lin'), 0],
+		[\filFreq, ControlSpec.new(10,4000,'exp'), 200],
+		[\rq, ControlSpec.new(0.01,1,'lin'), 0.5],
+	]);
+
+~potTemplates.put(\smoothSine, [
+		[\carrier, ControlSpec.new(10,400,'exp'), 0.5],
+		[\lfNoiseFreq, ControlSpec.new(1,25,'exp'), 0.5],
+		[\freqModFreq, ControlSpec.new(0.1,50,'exp'), 0.5],
+		[\freqAmp, ControlSpec.new(0,1,'lin'), 0],
+		[\ampModFreq, ControlSpec.new(0.1,50,'exp'), 0.5],
+		[\ampModAmp, ControlSpec.new(0,1,'lin'), 0],
+		[\lfFreq, ControlSpec.new(1,25,'exp'), 10],
+		[\lfAmp, ControlSpec.new(0.01,2000,'exp'), 0.01],
+	]);
+
+~sliderTemplates.put(\noiseySaw, [
+		[\amp,  ControlSpec.new(0,1,'lin'), 0.1],
+		[\pan,  ControlSpec.new(-1,1,'lin'), 0],
+		[\attackTime,  ControlSpec.new(0.01,5,'lin'), 0.01],
+		[\releaseTime,  ControlSpec.new(0.01,5,'lin'), 0.1],
+		[\lfNoiseFreq, ControlSpec.new(1,25,'exp'), 0.5],
+		[\lfNoiseAmp, ControlSpec.new(0,1,'lin'), 0],
+		[\lfFreq, ControlSpec.new(1,25,'exp'), 10],
+		[\lfAmp, ControlSpec.new(0.01,2000,'exp'), 0.01],
+	]);
+
+~sliderTemplates.put(\smoothSine, [
+		[\amp,  ControlSpec.new(0,1,'lin'), 0.1],
+		[\pan,  ControlSpec.new(-1,1,'lin'), 0],
+		[\attackTime,  ControlSpec.new(0.01,5,'lin'), 0.01],
+		[\releaseTime,  ControlSpec.new(0.01,5,'lin'), 0.1],
+		[\lfNoiseAmp, ControlSpec.new(0,1,'lin'), 0],
+	]);
+
+~synthPotControls = Dictionary();
+~synthSliderControls = Dictionary();
+~synthToggles = Dictionary();
+~synthTypes = Dictionary();
+
+8.do{|i|
+	var val = 36 + i;
+	~setSynthType.value(("synth_"++val).asSymbol, \noiseySaw);
+	~synthToggles.put(("synth_"++val).asSymbol, false);
+};
+
+~synths = Dictionary();
+~cSynth = nil;
+~cSynthKey = "synth_36".asSymbol;
+
+)
+
+
 
 //freeAll
 (
