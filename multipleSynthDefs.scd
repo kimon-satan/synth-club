@@ -2,6 +2,8 @@ MIDIIn.connectAll;
 
 (
 
+~granBuffer = Buffer.read(s, "/Users/simonkatan/Music/projectSamples/whereAmI/finalAudio/origami/makeAnAngled.wav");
+
 SynthDef.new(\noiseySaw, {|carrier= 100,
 	syncRate = 1,
 	freqModFreq = 0.2,
@@ -81,9 +83,99 @@ SynthDef.new(\smoothSine,{|
 	Out.ar(0,sig);
 }).send(s);
 
+SynthDef(\granSweeper, { |
+	sndbuf=0,
+	pos=0,
+	posShift=0,
+	posShiftFreq=1,
+	rate=1,
+	rateShift=0,
+	rateShiftFreq=1,
+	freq=20,
+	dur=0.1,
+	amp = 1,
+	pan = 0,
+	attackTime = 0.01,
+	decayTime = 0.01,
+	sustainLevel = 1,
+	releaseTime = 1,
+	gate = 1 |
+
+	var
+	synthPos = pos + LFNoise2.kr(posShiftFreq,posShift),
+	synthRate = rate + LFNoise2.kr(rateShiftFreq, rateShift, rateShift * -0.5),
+	sig = GrainBuf.ar(2, Impulse.kr(freq), dur, sndbuf, synthRate, synthPos, 2, pan,-1) * amp;
+	sig = sig * EnvGen.ar(Env.adsr(attackTime, decayTime, sustainLevel,releaseTime),gate,doneAction:2);
+	Out.ar(0,sig);
+}).send(s);
+
+~potTemplates = Dictionary();
+~sliderTemplates = Dictionary();
+
+~potTemplates.put(\noiseySaw, [
+	[\carrier, ControlSpec.new(10,400,'exp'), 0.5],
+	[\syncRate, ControlSpec.new(1,50,'exp'), 0.5],
+	[\freqModFreq, ControlSpec.new(0.1,50,'exp'), 0.5],
+	[\freqAmp, ControlSpec.new(0,1,'lin'), 0],
+	[\ampModFreq, ControlSpec.new(0.1,50,'exp'), 0.5],
+	[\ampModAmp, ControlSpec.new(0,1,'lin'), 0],
+	[\filFreq, ControlSpec.new(10,4000,'exp'), 200],
+	[\rq, ControlSpec.new(0.01,1,'lin'), 0.5],
+]);
+
+~potTemplates.put(\smoothSine, [
+	[\carrier, ControlSpec.new(10,400,'exp'), 0.5],
+	[\lfNoiseFreq, ControlSpec.new(1,25,'exp'), 0.5],
+	[\freqModFreq, ControlSpec.new(0.1,50,'exp'), 0.5],
+	[\freqAmp, ControlSpec.new(0,1,'lin'), 0],
+	[\ampModFreq, ControlSpec.new(0.1,50,'exp'), 0.5],
+	[\ampModAmp, ControlSpec.new(0,1,'lin'), 0],
+	[\lfFreq, ControlSpec.new(1,25,'exp'), 10],
+	[\lfAmp, ControlSpec.new(0.01,2000,'exp'), 0.01],
+]);
+
+~potTemplates.put(\granSweeper, [
+	[\pos, ControlSpec.new(0,1,'lin'), 0.5],
+	[\posShift, ControlSpec.new(0,0.5,'lin'), 0],
+	[\posShiftFreq, ControlSpec.new(0.2,20,'exp'), 1],
+	[\rate, ControlSpec.new(0.1,1,'lin'), 1],
+	[\rateShift, ControlSpec.new(0,1,'lin'), 0],
+	[\rateShiftFreq, ControlSpec.new(1,20,'exp'), 1],
+	[\freq, ControlSpec.new(1,20,'lin'), 10],
+	[\dur, ControlSpec.new(0.01,1,'lin'), 0.05],
+]);
+
+~sliderTemplates.put(\noiseySaw, [
+	[\amp,  ControlSpec.new(0,1,'lin'), 0.1],
+	[\pan,  ControlSpec.new(-1,1,'lin'), 0],
+	[\attackTime,  ControlSpec.new(0.01,5,'lin'), 0.01],
+	[\releaseTime,  ControlSpec.new(0.01,5,'lin'), 0.1],
+	[\lfNoiseFreq, ControlSpec.new(1,25,'exp'), 0.5],
+	[\lfNoiseAmp, ControlSpec.new(0,1,'lin'), 0],
+	[\lfFreq, ControlSpec.new(1,25,'exp'), 10],
+	[\lfAmp, ControlSpec.new(0.01,2000,'exp'), 0.01],
+]);
+
+~sliderTemplates.put(\smoothSine, [
+	[\amp,  ControlSpec.new(0,1,'lin'), 0.1],
+	[\pan,  ControlSpec.new(-1,1,'lin'), 0],
+	[\attackTime,  ControlSpec.new(0.01,5,'lin'), 0.01],
+	[\releaseTime,  ControlSpec.new(0.01,5,'lin'), 0.1],
+	[\lfNoiseAmp, ControlSpec.new(0,1,'lin'), 0],
+]);
+
+~sliderTemplates.put(\granSweeper, [
+	[\amp,  ControlSpec.new(0,1,'lin'), 0.1],
+	[\pan,  ControlSpec.new(-1,1,'lin'), 0],
+	[\attackTime,  ControlSpec.new(0.01,5,'lin'), 0.01],
+	[\releaseTime,  ControlSpec.new(0.01,5,'lin'), 0.1],
+]);
+
+
+
 )
 
-
+////////////////////// FUNCTIONS /////////////////////////////
 (
 //create the new synth with values according to the knobs
 ~startSynth = {|key, touchVel|
@@ -108,6 +200,11 @@ SynthDef.new(\smoothSine,{|
 
 		vals = vals.add(\amp);
 		vals = vals.add(spec.unmap(touchVel));
+	});
+
+	if(~synthTypes.at(key) == \granSweeper,{
+		vals.add(\sndbuf);
+		vals.add(~granBuffer);
 	});
 
 	~synths.put(key,Synth.new(~synthTypes.at(key),  vals));
@@ -145,54 +242,14 @@ SynthDef.new(\smoothSine,{|
 	);
 };
 
+
+
+
 )
 
-
+/////////////////////// DATA ////////////////////////
 (
 
-~potTemplates = Dictionary();
-~sliderTemplates = Dictionary();
-
-~potTemplates.put(\noiseySaw, [
-		[\carrier, ControlSpec.new(10,400,'exp'), 0.5],
-		[\syncRate, ControlSpec.new(1,50,'exp'), 0.5],
-		[\freqModFreq, ControlSpec.new(0.1,50,'exp'), 0.5],
-		[\freqAmp, ControlSpec.new(0,1,'lin'), 0],
-		[\ampModFreq, ControlSpec.new(0.1,50,'exp'), 0.5],
-		[\ampModAmp, ControlSpec.new(0,1,'lin'), 0],
-		[\filFreq, ControlSpec.new(10,4000,'exp'), 200],
-		[\rq, ControlSpec.new(0.01,1,'lin'), 0.5],
-	]);
-
-~potTemplates.put(\smoothSine, [
-		[\carrier, ControlSpec.new(10,400,'exp'), 0.5],
-		[\lfNoiseFreq, ControlSpec.new(1,25,'exp'), 0.5],
-		[\freqModFreq, ControlSpec.new(0.1,50,'exp'), 0.5],
-		[\freqAmp, ControlSpec.new(0,1,'lin'), 0],
-		[\ampModFreq, ControlSpec.new(0.1,50,'exp'), 0.5],
-		[\ampModAmp, ControlSpec.new(0,1,'lin'), 0],
-		[\lfFreq, ControlSpec.new(1,25,'exp'), 10],
-		[\lfAmp, ControlSpec.new(0.01,2000,'exp'), 0.01],
-	]);
-
-~sliderTemplates.put(\noiseySaw, [
-		[\amp,  ControlSpec.new(0,1,'lin'), 0.1],
-		[\pan,  ControlSpec.new(-1,1,'lin'), 0],
-		[\attackTime,  ControlSpec.new(0.01,5,'lin'), 0.01],
-		[\releaseTime,  ControlSpec.new(0.01,5,'lin'), 0.1],
-		[\lfNoiseFreq, ControlSpec.new(1,25,'exp'), 0.5],
-		[\lfNoiseAmp, ControlSpec.new(0,1,'lin'), 0],
-		[\lfFreq, ControlSpec.new(1,25,'exp'), 10],
-		[\lfAmp, ControlSpec.new(0.01,2000,'exp'), 0.01],
-	]);
-
-~sliderTemplates.put(\smoothSine, [
-		[\amp,  ControlSpec.new(0,1,'lin'), 0.1],
-		[\pan,  ControlSpec.new(-1,1,'lin'), 0],
-		[\attackTime,  ControlSpec.new(0.01,5,'lin'), 0.01],
-		[\releaseTime,  ControlSpec.new(0.01,5,'lin'), 0.1],
-		[\lfNoiseAmp, ControlSpec.new(0,1,'lin'), 0],
-	]);
 
 ~synthPotControls = Dictionary();
 ~synthSliderControls = Dictionary();
@@ -220,7 +277,5 @@ SynthDef.new(\smoothSine,{|
 	~synthToggles.put(key, false);
 };
 )
-
-
 
 
