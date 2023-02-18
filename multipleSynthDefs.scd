@@ -88,8 +88,6 @@ SynthDef.new(\smoothSine,{|
 ~potTemplates = Dictionary();
 ~sliderTemplates = Dictionary();
 
-
-
 ~potTemplates.put(\noiseySaw, [
 		[\carrier, ControlSpec.new(10,400,'exp'), 0.5],
 		[\syncRate, ControlSpec.new(1,50,'exp'), 0.5],
@@ -103,7 +101,7 @@ SynthDef.new(\smoothSine,{|
 
 ~potTemplates.put(\smoothSine, [
 		[\carrier, ControlSpec.new(10,400,'exp'), 0.5],
-		[\syncRate, ControlSpec.new(1,50,'exp'), 0.5],
+		[\lfNoiseFreq, ControlSpec.new(1,25,'exp'), 0.5],
 		[\freqModFreq, ControlSpec.new(0.1,50,'exp'), 0.5],
 		[\freqAmp, ControlSpec.new(0,1,'lin'), 0],
 		[\ampModFreq, ControlSpec.new(0.1,50,'exp'), 0.5],
@@ -111,7 +109,6 @@ SynthDef.new(\smoothSine,{|
 		[\lfFreq, ControlSpec.new(1,25,'exp'), 10],
 		[\lfAmp, ControlSpec.new(0.01,2000,'exp'), 0.01],
 	]);
-
 
 ~sliderTemplates.put(\noiseySaw, [
 		[\amp,  ControlSpec.new(0,1,'lin'), 0.1],
@@ -129,7 +126,6 @@ SynthDef.new(\smoothSine,{|
 		[\pan,  ControlSpec.new(-1,1,'lin'), 0],
 		[\attackTime,  ControlSpec.new(0.01,5,'lin'), 0.01],
 		[\releaseTime,  ControlSpec.new(0.01,5,'lin'), 0.1],
-		[\lfNoiseFreq, ControlSpec.new(1,25,'exp'), 0.5],
 		[\lfNoiseAmp, ControlSpec.new(0,1,'lin'), 0],
 	]);
 
@@ -139,17 +135,18 @@ SynthDef.new(\smoothSine,{|
 ~synthTypes = Dictionary();
 
 8.do{|i|
-	var val = 36 + i;
+	var val = 36 + i, potControls, sliderControls;
 	~synthTypes.put(("synth_"++val).asSymbol, \smoothSine);
-	~synthPotControls.put(("synth_"++val).asSymbol,~potTemplates.at(\smoothSine));
-	~synthSliderControls.put(("synth_"++val).asSymbol, ~sliderTemplates.at(\smoothSine));
-	~synthToggles.put(("synth_"++val).asSymbol, false);
-};
 
-~updatePot = {|potIndex, val|
-	~pots[potIndex].value = val;
-	~potsSynced[potIndex] = false;
-	~pots[potIndex].setColors(knobColors: [Color.red]);
+	potControls = ~potTemplates.at(\smoothSine).collectCopy({|x|x.collectCopy({|y|y})});
+	~synthPotControls.put(("synth_"++val).asSymbol,
+		potControls
+	);
+	sliderControls = ~sliderTemplates.at(\smoothSine).collectCopy({|x|x.collectCopy({|y|y})});
+	~synthSliderControls.put(("synth_"++val).asSymbol,
+		sliderControls
+	);
+	~synthToggles.put(("synth_"++val).asSymbol, false);
 };
 
 ~synths = Dictionary();
@@ -158,8 +155,7 @@ SynthDef.new(\smoothSine,{|
 
 )
 
-//reset pots to zero
-8.do{|i|{~updatePot.value(i,0)}.defer};
+
 
 (
 //create the new synth with values according to the knobs
@@ -195,29 +191,9 @@ SynthDef.new(\smoothSine,{|
 
 };
 
-
-
 ~switchSynth = {|key|
 	~cSynth = ~synths.at(key.asSymbol);
 	~cSynthKey = key.asSymbol;
-	~synthPotControls.at(key).do({|v,i|
-		{~updatePot.value(i, v[2])}.defer;
-	});
-
-	~synthSliderControls.at(key).do({|v,i|
-		{~sliders[i].value = v[2];}.defer;
-	});
-
-	// TODO: update gui labels
-
-	{
-		~listView.value = ~findIndex.value(~listView.items, key);
-		if(~synthToggles.at(key) == true,
-			{~releaseButton.value = 1;
-				~releaseButton.value.postln;
-			},
-			{~releaseButton.value = 0});
-	}.defer;
 };
 
 ~releaseSynth = {|key|
@@ -226,192 +202,19 @@ SynthDef.new(\smoothSine,{|
 	~synths.removeAt(key);
 	{
 		~synthToggles.put(key, false);
-		~releaseButton.value = 0;
 	}.defer;
 };
 
-~findIndex = {|list, key|
-	var val = nil;
-	list.do{|v,i| if(v.key == key, {val = i})};
-	val;
-}
-
 )
-
-
 
 //freeAll
 (
-
 ~synths.keys.do{|key|
 	~releaseSynth.value(key);
 	~synthToggles.put(key, false);
 };
-
 )
 
 
-// TODO: add a synth type selector box
-// Implement changing labels
 
-//create the GUI mirror
-(
-
-var kLayout;
-
-
-try{ w.close}{"no window yet".postln};
-w=Window.new("GUI", 700@700).front;
-w.view.decorator=FlowLayout(w.view.bounds);
-w.view.decorator.gap=8@8;
-
-~listView = EZListView.new(w,200@230, "Select Synth");
-
-//todo make ordered
-8.do{|i|
-	var key = ("synth_"++(i+36)).asSymbol;
-	~listView.addItem(key,{~switchSynth.value(key)});
-};
-
-//// Buttons
-
-~releaseButton = Button.new(w,80@60);
-~releaseButton.states_([["Start"],["Release", Color.black,Color.green]]);
-~releaseButton.action = {|butt|
-	if(butt.value == 1,{
-		~startSynth.value(~cSynthKey)
-	},{
-		~releaseSynth.value(~cSynthKey)
-	})
-
-};
-
-
-w.view.decorator.nextLine;
-
-~sliders = [];
-
-~sliderTemplates.at(\smoothSine).size().do{|i|
-	var key = ("synth_36").asSymbol,
-	slider = EZSlider.new(w, 400@20,
-		label: ~synthSliderControls.at(key)[i][0].asString,
-		initVal: ~synthSliderControls.at(key)[i][2],
-		action: {|v|
-			// TODO: debug this
-			if(~cSynth != nil, {
-			~cSynth.set(~synthSliderControls.at(~cSynthKey)[i][0],~synthSliderControls.at(~cSynthKey)[i][1].map(v.value));
-			});
-			~synthSliderControls.at(~cSynthKey)[i][2] = v.value
-		}
-	);
-
-	~sliders = ~sliders.add(slider);
-};
-
-w.view.decorator.nextLine;
-
-~potsSynced = Array.fill(8,{false});
-
-~pots = [];
-
-
-2.do{|r|
-	4.do{|c|
-		var i = r * 4 + c, key = ("synth_36").asSymbol,
-		pot = EZKnob.new(w, 150@120,
-			label: ~synthPotControls.at(key)[i][0].asString,
-			initVal: ~synthPotControls.at(key)[i][2],
-			action: {|v|
-
-				if(~cSynth != nil, {
-					~cSynth.set(~synthPotControls.at(~cSynthKey)[i][0],~synthPotControls.at(~cSynthKey)[i][1].map(v.value));
-				});
-				~synthPotControls.at(~cSynthKey)[i][2] = v.value
-			}
-		);
-		{pot.setColors(knobColors: [Color.red])}.defer;
-		~pots = ~pots.add(pot);
-	};
-	w.view.decorator.nextLine;
-};
-
-a.free;
-a = MIDIFunc.cc({|val,id|
-	var index = id - 70,
-	spec = ControlSpec(0,127,\lin,1,0);
-
-	{
-		//get the current gui value
-
-		if(~potsSynced.at(index) == true,{
-			~pots.at(index).valueAction_(spec.unmap(val));
-
-		},{
-			var diff = (~pots[index].value - spec.unmap(val)).abs;
-			if(diff <= (2/128),{
-				~potsSynced[index] = true;
-				~pots[index].setColors(knobColors: [Color.green]);
-
-			},{diff.postln});
-		});
-
-
-
-	}.defer;
-});
-
-
-//// PADS
-
-
-~pads.do({|v,i| ~pads[i].free});
-~pads = [];
-
-//top 4 momentary
-4.do{|i|
-
-	var val = i+40;
-
-	~pads = ~pads.add(
-		MIDIFunc.noteOn({|touchVel|
-			~startSynth.value(("synth_"++val).asSymbol, touchVel);
-	},val));
-
-	~pads = ~pads.add(
-		MIDIFunc.noteOff({
-			~releaseSynth.value(("synth_"++val).asSymbol);
-	},val));
-};
-
-
-//bottom 4
-4.do{|i|
-	var val = i+36;
-	~pads = ~pads.add(
-		MIDIFunc.noteOn({
-			if(~synthToggles.at(("synth_"++val).asSymbol) == false,{
-				~synthToggles.put(("synth_"++val).asSymbol, true);
-				~startSynth.value(("synth_"++val).asSymbol);
-
-			},{
-
-				~releaseSynth.value(("synth_"++val).asSymbol);
-
-			});
-
-	},val));
-
-};
-
-
-
-)
-
-/*
-TODO:
-
-- toggle autoSwitch on/off
-
-
-*/
 
