@@ -13,8 +13,12 @@ SynthDef.new(\noiseySaw, {|carrier= 100,
 	lfNoiseFreq = 1,
 	lfNoiseAmp = 0.2,
 	amp = 0.1,
-	pan = 0
-	|
+	pan = 0,
+	attackTime = 0.01,
+	decayTime = 0.01,
+	sustainLevel = 1,
+	releaseTime = 1,
+	gate = 1|
 
 	var freqMod = SinOsc.kr(freqModFreq,freqPhase,carrier*freqAmp,carrier),
 	ampMod = LFTri.ar(ampModFreq, ampPhase, ampModAmp, 1-ampModAmp) * amp,
@@ -26,6 +30,8 @@ SynthDef.new(\noiseySaw, {|carrier= 100,
 		syncRate * freqMod, //swap freqMod for carrier for sweep effect
 		ampMod * noise),
 	pan);
+
+	sig = sig * EnvGen.ar(Env.adsr(attackTime, decayTime, sustainLevel,releaseTime),gate,doneAction:2);
 
 	Out.ar(0,sig);
 
@@ -88,6 +94,34 @@ SynthDef.new(\noiseySaw, {|carrier= 100,
 	}.defer;
 };
 
+~addTempSynth = {|idx|
+	var vals = [],
+	key = ("noiseySaw_temp_"++idx).asSymbol;
+	//record the old values in the ~cSynth
+	/* if(~cSynth != nil,{
+	~cSynth[1] = ~noiseySawControl.collect({|v| v[2]});
+	});*/
+	~noiseySawControl.do({|v,i|
+		vals = vals.add(v[0]);
+		vals = vals.add(v[1].map(v[2]));
+		{~updatePot.value(i, v[2])}.defer;
+	});
+	~synths.put(key,[
+		Synth.new(\noiseySaw,  vals),
+		~noiseySawControl.collect({|v| v[2]})
+	]);
+
+	~cSynth = ~synths.at(key);
+
+	{~listView.addItem(key, {|lv|
+		("switch "++lv.item).postln;
+		~switchSynth.value(lv.item);
+	});
+	//switch to that item
+	~listView.value = ~listView.items.size - 1;
+	}.defer;
+};
+
 
 //TODO adapt for dictionary
 ~switchSynth = {|key|
@@ -96,14 +130,27 @@ SynthDef.new(\noiseySaw, {|carrier= 100,
 	~cSynth[1].do({|v,i|
 		{~updatePot.value(i, v)}.defer;
 	});
+};
+
+~releaseSynth = {|key|
+	~synths.at(key)[0].set(\gate, 0);
+	~listView.items = ~removeAtIndex.value(~listView.items,key);
+	~synths.removeAt(key);
+	~listView.value = 0;
+	~cSynth = nil;
+};
+
+~removeAtIndex = {|list, key|
+	list.do{|v,i| if(v.key == key, {list.removeAt(i)})};
 }
+
 
 )
 
 
 //freeAll
 (
-~synths.keys.do{|key| ~synths.at(key)[0].free};
+~synths.keys.do{|key| ~synths.at(key)[0].set(\gate, 0)};
 ~synths = Dictionary();
 ~cSynth = nil;
 ~synthIndex = 0;
@@ -126,6 +173,13 @@ w.view.decorator.gap=4@4;
 ~listView = EZListView.new(w,200@230, "Select Synth");
 ~listView.addItem(\none,{~cSynth = nil});
 
+//// Buttons
+
+~releaseButton = Button.new(w,80@60);
+~releaseButton.string = "Release";
+~releaseButton.action = {	if(~listView.value > 0,{
+	~releaseSynth.value(~listView.items.at(~listView.value).key);
+});};
 
 w.view.decorator.nextLine;
 
@@ -180,6 +234,9 @@ a = MIDIFunc.cc({|val,id|
 	}.defer;
 });
 
+
+//// PADS
+
 b.free;
 b = MIDIFunc.noteOn({|velocity|
 
@@ -187,8 +244,29 @@ b = MIDIFunc.noteOn({|velocity|
 
 },36);
 
+c.free;
+c = MIDIFunc.noteOn({
+	{if(~listView.value > 0,{
+		~releaseSynth.value(~listView.items.at(~listView.value).key);
+	});}.defer;
+},37);
+
+~pads.do({|v,i| ~pads[i].free});
+~pads = [];
+4.do{|i|
+	var val = i+40;
+	~pads = ~pads.add(
+		MIDIFunc.noteOn({
+			~addTempSynth.value(val);
+	},val));
+
+	~pads = ~pads.add(
+		MIDIFunc.noteOff({
+			{~releaseSynth.value(("noiseySaw_temp_"++val).asSymbol);}.defer;
+	},val));
+};
+
+
 
 )
 
-~listView.items;
-~listView.value = 1
